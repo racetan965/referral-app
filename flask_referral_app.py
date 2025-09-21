@@ -19,7 +19,7 @@ APP_TITLE = "Referral System"
 # ------------------------------
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://user:pass@host:5432/dbname",  # عدّل الافتراضي إذا بدك
+    "postgresql://crash_plane_db_user:EzM2x89JDAZCiOcutyajUy0Hs6UwCyHb@dpg-d31qndumcj7s738vo5c0-a.oregon-postgres.render.com/crash_plane_db",
 )
 
 app = Flask(__name__)
