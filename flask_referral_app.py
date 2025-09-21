@@ -478,8 +478,8 @@ def signup():
 
             user_code = gen_code()
             cur.execute("""
-                INSERT INTO ref_users(username, code, first_name, last_name, phone, telegram_id, referred_by_user_id, created_at)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+                INSERT INTO ref_users(username, code, first_name, middle_name, last_name, phone, telegram_id, referred_by_user_id, created_at)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%,%s)
                 RETURNING *
             """, (
                 username,
@@ -648,7 +648,7 @@ def search():
                    OR telegram_id ILIKE %s
                 ORDER BY id DESC
                 LIMIT 200
-            """, (qlike, qlike, qlike, qlike, qlike, qlike))
+            """, (qlike, qlike, qlike, qlike, qlike, qlike, qlike))
             results = cur.fetchall()
     return render_template("search.html", APP_TITLE=APP_TITLE, q=q, results=results)
 
