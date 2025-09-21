@@ -432,3 +432,220 @@ TEMPLATES_DICT = {
 }
 existing_loader = app.jinja_loader
 app.jinja_loader = ChoiceLoader([DictLoader(TEMPLATES_DICT), existing_loader])
+
+# ------------------------------
+# Routes
+# ------------------------------
+
+@app.route("/")
+def index():
+    return render_template("index.html", APP_TITLE=APP_TITLE)
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username    = request.form.get("username")
+        first_name  = request.form.get("first_name")
+        last_name   = request.form.get("last_name")
+        phone       = request.form.get("phone")
+        telegram_id = request.form.get("telegram_id")
+        ref_code    = request.form.get("referral_code")
+        ref_user    = request.form.get("referral_username")
+
+        try:
+            # resolve referrer
+            referred_by_id = None
+            if ref_code:
+                ref = get_user_by_code(ref_code)
+                if ref:
+                    referred_by_id = ref["id"]
+            if referred_by_id is None and ref_user:
+                ref = get_user_by_username(ref_user)
+                if ref:
+                    referred_by_id = ref["id"]
+
+            db = get_db()
+            cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            user_code = gen_code()
+            cur.execute("""
+                INSERT INTO ref_users(username, code, first_name, last_name, phone, telegram_id, referred_by_user_id, created_at)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING *
+            """, (
+                username,
+                user_code,
+                first_name or "",
+                last_name or "",
+                phone,
+                telegram_id,
+                referred_by_id,
+                datetime.utcnow()
+            ))
+            new_user = cur.fetchone()
+            db.commit()
+
+            if referred_by_id and referred_by_id != new_user["id"]:
+                record_referral(referred_by_id, new_user["id"])
+
+            flash(f"✅ Created: {new_user['username']} ({new_user['code']})", "ok")
+            return redirect(url_for("user_by_code", code=new_user["code"]))
+        except Exception as e:
+            db.rollback()
+            flash(f"❌ {str(e)}", "err")
+
+    return render_template("signup.html", APP_TITLE=APP_TITLE)
+
+@app.route("/fill", methods=["GET", "POST"])
+def fill_user():
+    db = get_db()
+    if request.method == "POST":
+        identifier = request.form.get("identifier")
+        first_name = request.form.get("first_name")
+        last_name  = request.form.get("last_name")
+        phone      = request.form.get("phone")
+        telegram_id= request.form.get("telegram_id")
+
+        with dict_cur(db) as cur:
+            cur.execute("SELECT * FROM ref_users WHERE code=%s OR username=%s LIMIT 1", (identifier, identifier))
+            user = cur.fetchone()
+            if not user:
+                flash("❌ User not found", "err")
+            else:
+                cur.execute("""
+                    UPDATE ref_users
+                    SET first_name=%s, last_name=%s, phone=%s, telegram_id=%s
+                    WHERE id=%s
+                """, (first_name, last_name, phone, telegram_id, user["id"]))
+                db.commit()
+                flash("✅ User updated successfully", "ok")
+
+                cur.execute("SELECT username, code FROM ref_users WHERE id=%s", (user["referred_by_user_id"],)) if user["referred_by_user_id"] else None
+                ref = cur.fetchone() if user["referred_by_user_id"] else None
+                cur.execute("""
+                    SELECT u.username, u.code
+                    FROM referrals r JOIN ref_users u ON u.id=r.referred_user_id
+                    WHERE r.referrer_user_id=%s
+                """, (user["id"],))
+                refs = cur.fetchall()
+                return render_template("dashboard.html", user=user, ref=ref, referrals=refs, APP_TITLE=APP_TITLE)
+
+    return render_template("fill.html", APP_TITLE=APP_TITLE)
+
+@app.route("/u/<code>")
+def user_by_code(code):
+    db = get_db()
+    with dict_cur(db) as cur:
+        cur.execute("SELECT * FROM ref_users WHERE code=%s", (code,))
+        user = cur.fetchone()
+        if not user:
+            abort(404)
+
+        ref = None
+        if user["referred_by_user_id"]:
+            cur.execute("SELECT username, code FROM ref_users WHERE id=%s", (user["referred_by_user_id"],))
+            ref = cur.fetchone()
+
+        cur.execute("""
+            SELECT u.username, u.code
+            FROM referrals r JOIN ref_users u ON u.id=r.referred_user_id
+            WHERE r.referrer_user_id=%s
+            ORDER BY r.id DESC
+        """, (user["id"],))
+        refs = cur.fetchall()
+    return render_template("dashboard.html", user=user, ref=ref, referrals=refs, APP_TITLE=APP_TITLE)
+
+@app.route("/u/<code>/edit", methods=["GET", "POST"])
+def edit_user(code):
+    db = get_db()
+    with dict_cur(db) as cur:
+        cur.execute("SELECT * FROM ref_users WHERE code=%s", (code,))
+        user = cur.fetchone()
+        if not user:
+            abort(404)
+
+        if request.method == "POST":
+            first_name  = request.form.get("first_name")
+            last_name   = request.form.get("last_name")
+            phone       = request.form.get("phone")
+            telegram_id = request.form.get("telegram_id")
+
+            cur.execute("""
+                UPDATE ref_users
+                SET first_name=%s, last_name=%s, phone=%s, telegram_id=%s
+                WHERE id=%s
+            """, (first_name, last_name, phone, telegram_id, user["id"]))
+            db.commit()
+            flash("✅ User updated successfully", "ok")
+            return redirect(url_for("user_by_code", code=code))
+
+    return render_template("edit.html", user=user, APP_TITLE=APP_TITLE)
+
+@app.route("/admin/bulk_add", methods=["GET", "POST"])
+def admin_bulk_add():
+    db = get_db()
+    if request.method == "POST":
+        usernames_text = request.form.get("usernames", "").strip()
+        if not usernames_text:
+            flash("❌ Please enter at least one username", "err")
+            return render_template("admin_bulk_add.html", APP_TITLE=APP_TITLE)
+
+        usernames = [u.strip() for u in usernames_text.splitlines() if u.strip()]
+        added, skipped = [], []
+
+        for uname in usernames:
+            try:
+                code = gen_code()
+                with dict_cur(db) as cur:
+                    cur.execute(
+                        """INSERT INTO ref_users(username, code, created_at)
+                           VALUES (%s, %s, %s)
+                           ON CONFLICT (username) DO NOTHING
+                           RETURNING *""",
+                        (uname, code, datetime.utcnow())
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        db.commit()
+                        added.append(uname)
+                    else:
+                        skipped.append(uname)
+            except Exception:
+                db.rollback()
+                skipped.append(uname)
+
+        flash(f"✅ Added: {', '.join(added)}" if added else "⚠️ No new users added", "ok")
+        if skipped:
+            flash(f"⏭ Skipped: {', '.join(skipped)}", "err")
+
+    return render_template("admin_bulk_add.html", APP_TITLE=APP_TITLE)
+
+@app.route("/search")
+def search():
+    q = request.args.get("q")
+    results = []
+    if q is not None:
+        qlike = f"%{q}%"
+        db = get_db()
+        with dict_cur(db) as cur:
+            cur.execute("""
+                SELECT * FROM ref_users
+                WHERE username ILIKE %s
+                   OR code ILIKE %s
+                   OR first_name ILIKE %s
+                   OR last_name ILIKE %s
+                   OR phone ILIKE %s
+                   OR telegram_id ILIKE %s
+                ORDER BY id DESC
+                LIMIT 200
+            """, (qlike, qlike, qlike, qlike, qlike, qlike))
+            results = cur.fetchall()
+    return render_template("search.html", APP_TITLE=APP_TITLE, q=q, results=results)
+
+@app.route("/admin/accounts")
+def admin_accounts():
+    return render_template("admin_accounts.html", APP_TITLE=APP_TITLE)
+
+@app.route("/admin/blacklist")
+def admin_blacklist():
+    return render_template("admin_blacklist.html", APP_TITLE=APP_TITLE)
