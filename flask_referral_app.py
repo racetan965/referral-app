@@ -455,6 +455,7 @@ def signup():
     if request.method == "POST":
         username    = request.form.get("username")
         first_name  = request.form.get("first_name")
+        middle_name = request.form.get("middle_name")
         last_name   = request.form.get("last_name")
         phone       = request.form.get("phone")
         telegram_id = request.form.get("telegram_id")
@@ -479,12 +480,13 @@ def signup():
             user_code = gen_code()
             cur.execute("""
                 INSERT INTO ref_users(username, code, first_name, middle_name, last_name, phone, telegram_id, referred_by_user_id, created_at)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%,%s)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING *
             """, (
                 username,
                 user_code,
                 first_name or "",
+                middle_name or "",
                 last_name or "",
                 phone,
                 telegram_id,
@@ -511,6 +513,7 @@ def fill_user():
     if request.method == "POST":
         identifier = request.form.get("identifier")
         first_name = request.form.get("first_name")
+        middle_name = request.form.get("middle_name")
         last_name  = request.form.get("last_name")
         phone      = request.form.get("phone")
         telegram_id= request.form.get("telegram_id")
@@ -525,7 +528,7 @@ def fill_user():
                     UPDATE ref_users
                     SET first_name=%s, middle_name=%s, last_name=%s, phone=%s, telegram_id=%s
                     WHERE id=%s
-                """, (first_name, last_name, phone, telegram_id, user["id"]))
+                """, (first_name, middle_name, last_name, phone, telegram_id, user["id"]))
                 db.commit()
                 flash("✅ User updated successfully", "ok")
 
@@ -575,15 +578,16 @@ def edit_user(code):
 
         if request.method == "POST":
             first_name  = request.form.get("first_name")
+            middle_name = request.form.get("middle_name")
             last_name   = request.form.get("last_name")
             phone       = request.form.get("phone")
             telegram_id = request.form.get("telegram_id")
 
             cur.execute("""
                 UPDATE ref_users
-                SET first_name=%s, last_name=%s, phone=%s, telegram_id=%s
+                SET first_name=%s, middle_name=%s, last_name=%s, phone=%s, telegram_id=%s
                 WHERE id=%s
-            """, (first_name, last_name, phone, telegram_id, user["id"]))
+            """, (first_name, middle_name, last_name, phone, telegram_id, user["id"]))
             db.commit()
             flash("✅ User updated successfully", "ok")
             return redirect(url_for("user_by_code", code=code))
