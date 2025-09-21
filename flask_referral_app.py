@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS ref_users(
     username TEXT UNIQUE NOT NULL,
     code TEXT UNIQUE NOT NULL,
     first_name TEXT,
+    middle_name TEXT,
     last_name TEXT,
     phone TEXT,
     telegram_id TEXT,
@@ -266,6 +267,7 @@ SIGNUP_HTML = """
   <form method="post">
     <input name="username" placeholder="Username" required><br>
     <input name="first_name" placeholder="First name"><br>
+    <input name="middle_name" placeholder="Middle name"><br>
     <input name="last_name" placeholder="Last name"><br>
     <input name="phone" placeholder="Phone"><br>
     <input name="telegram_id" placeholder="Telegram ID"><br>
@@ -288,6 +290,9 @@ FILL_HTML = """
     </div>
     <div>
       <label>First Name<br><input name="first_name"></label>
+    </div>
+    <div>
+      <label>Middle Name<br><input name="middle_name"></label>
     </div>
     <div>
       <label>Last Name<br><input name="last_name"></label>
@@ -349,7 +354,7 @@ SEARCH_HTML = """
             <tr>
               <td><a href="{{ url_for('edit_user', code=u.code) }}">{{ u.username }}</a></td>
               <td>{{ u.code }}</td>
-              <td>{{ (u.first_name ~ ' ' ~ u.last_name).strip() }}</td>
+              <td>{{ (u.first_name ~ ' ' ~ u.middle_name ~ ' ' ~ u.last_name).strip() }}</td>
               <td>{{ u.phone or '' }}</td>
               <td>{{ u.telegram_id or '' }}</td>
             </tr>
@@ -371,6 +376,10 @@ EDIT_HTML = """
     <div>
       <label>First Name</label>
       <input name="first_name" value="{{ user.first_name or '' }}" style="width:100%;">
+    </div>
+    <div>
+      <label>Middle Name</label>
+      <input name="middle_name" value="{{ user.middle_name or '' }}" style="width:100%;">
     </div>
     <div>
       <label>Last Name</label>
@@ -514,7 +523,7 @@ def fill_user():
             else:
                 cur.execute("""
                     UPDATE ref_users
-                    SET first_name=%s, last_name=%s, phone=%s, telegram_id=%s
+                    SET first_name=%s, middle_name=%s, last_name=%s, phone=%s, telegram_id=%s
                     WHERE id=%s
                 """, (first_name, last_name, phone, telegram_id, user["id"]))
                 db.commit()
@@ -598,8 +607,8 @@ def admin_bulk_add():
                 code = gen_code()
                 with dict_cur(db) as cur:
                     cur.execute(
-                        """INSERT INTO ref_users(username, code, created_at)
-                           VALUES (%s, %s, %s)
+                        """INSERT INTO ref_users(username, code, first_name, middle_name, last_name, phone, telegram_id, referred_by_user_id, created_at)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                            ON CONFLICT (username) DO NOTHING
                            RETURNING *""",
                         (uname, code, datetime.utcnow())
@@ -633,6 +642,7 @@ def search():
                 WHERE username ILIKE %s
                    OR code ILIKE %s
                    OR first_name ILIKE %s
+                   OR middle_name ILIKE %s
                    OR last_name ILIKE %s
                    OR phone ILIKE %s
                    OR telegram_id ILIKE %s
