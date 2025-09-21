@@ -15,43 +15,22 @@ import string
 APP_TITLE = "Referral System"
 
 # ------------------------------
-<<<<<<< HEAD
 # DB CONFIG (PostgreSQL)
 # ------------------------------
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://crash_plane_db_user:EzM2x89JDAZCiOcutyajUy0Hs6UwCyHb@dpg-d31qndumcj7s738vo5c0-a.oregon-postgres.render.com/crash_plane_db",
+    "postgresql://user:pass@host:5432/dbname",  # عدّل الافتراضي إذا بدك
 )
-=======
-# إعدادات PostgreSQL
-# ------------------------------
-PG_CONFIG = {
-    "dbname": os.environ.get("PG_DB", "referrals"),
-    "user": os.environ.get("PG_USER", "postgres"),
-    "password": os.environ.get("PG_PASSWORD", "postgres"),
-    "host": os.environ.get("PG_HOST", "localhost"),
-    "port": os.environ.get("PG_PORT", "5432"),
-}
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
 # ------------------------------
-<<<<<<< HEAD
 # DB helpers & schema
 # ------------------------------
 def get_db():
     if "db" not in g:
         g.db = psycopg2.connect(DATABASE_URL)
-=======
-# Database helpers & schema
-# ------------------------------
-
-def get_db():
-    if "db" not in g:
-        g.db = psycopg2.connect(**PG_CONFIG)
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
     return g.db
 
 @app.teardown_appcontext
@@ -61,11 +40,7 @@ def close_db(exc):
         db.close()
 
 SCHEMA = """
-<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS ref_users(
-=======
-CREATE TABLE IF NOT EXISTS users(
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
     id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     code TEXT UNIQUE NOT NULL,
@@ -75,11 +50,7 @@ CREATE TABLE IF NOT EXISTS users(
     telegram_id TEXT,
     referred_by_user_id INTEGER,
     created_at TIMESTAMP NOT NULL,
-<<<<<<< HEAD
     FOREIGN KEY(referred_by_user_id) REFERENCES ref_users(id)
-=======
-    FOREIGN KEY(referred_by_user_id) REFERENCES users(id)
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
 );
 
 CREATE TABLE IF NOT EXISTS referrals(
@@ -88,13 +59,8 @@ CREATE TABLE IF NOT EXISTS referrals(
     referred_user_id INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL,
     UNIQUE(referrer_user_id, referred_user_id),
-<<<<<<< HEAD
     FOREIGN KEY(referrer_user_id) REFERENCES ref_users(id),
     FOREIGN KEY(referred_user_id)  REFERENCES ref_users(id)
-=======
-    FOREIGN KEY(referrer_user_id) REFERENCES users(id),
-    FOREIGN KEY(referred_user_id)  REFERENCES users(id)
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
 );
 
 CREATE TABLE IF NOT EXISTS reserved_accounts(
@@ -105,26 +71,17 @@ CREATE TABLE IF NOT EXISTS reserved_accounts(
     assigned_user_id INTEGER,
     assigned_at TIMESTAMP,
     notes TEXT,
-<<<<<<< HEAD
     FOREIGN KEY(assigned_user_id) REFERENCES ref_users(id)
-=======
-    FOREIGN KEY(assigned_user_id) REFERENCES users(id)
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
 );
 
 CREATE TABLE IF NOT EXISTS blacklist(
     id SERIAL PRIMARY KEY,
-<<<<<<< HEAD
     kind TEXT NOT NULL,               -- phone | name | telegram_id | referral_code | referral_username
-=======
-    kind TEXT NOT NULL,
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
     value TEXT NOT NULL,
     reason TEXT,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL
 );
-<<<<<<< HEAD
 
 CREATE INDEX IF NOT EXISTS idx_ref_users_username ON ref_users(username);
 CREATE INDEX IF NOT EXISTS idx_ref_users_code     ON ref_users(code);
@@ -132,13 +89,10 @@ CREATE INDEX IF NOT EXISTS idx_ref_users_phone    ON ref_users(phone);
 CREATE INDEX IF NOT EXISTS idx_ref_users_tg       ON ref_users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_reserved_currency  ON reserved_accounts(currency, is_assigned);
 CREATE INDEX IF NOT EXISTS idx_blacklist_kind_val ON blacklist(kind, value);
-=======
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
 """
 
 def init_db():
     db = get_db()
-<<<<<<< HEAD
     with db.cursor() as cur:
         cur.execute("BEGIN;")
         for stmt in SCHEMA.split(";"):
@@ -151,22 +105,6 @@ def init_db():
 # Utils
 # ------------------------------
 def gen_code(n: int = 8) -> str:
-    import string, secrets
-=======
-    cur = db.cursor()
-    for stmt in SCHEMA.split(";"):
-        stmt = stmt.strip()
-        if stmt:
-            cur.execute(stmt)
-    db.commit()
-    cur.close()
-
-# ------------------------------
-# Utilities
-# ------------------------------
-
-def gen_code(n: int = 8) -> str:
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
@@ -175,7 +113,6 @@ def normalize(s: Optional[str]) -> Optional[str]:
         return None
     return " ".join(s.strip().lower().split())
 
-<<<<<<< HEAD
 def dict_cur(db):
     return db.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -206,54 +143,15 @@ def record_referral(referrer_id: int, referred_id: int):
             db.commit()
         except Exception:
             db.rollback()
-=======
-def fetchone_dict(cur):
-    row = cur.fetchone()
-    return dict(row) if row else None
-
-def fetchall_dict(cur):
-    rows = cur.fetchall()
-    return [dict(r) for r in rows]
-
-def get_user_by_code(code: str):
-    db = get_db()
-    cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM users WHERE code=%s", (code,))
-    return cur.fetchone()
-
-def get_user_by_username(username: str):
-    db = get_db()
-    cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM users WHERE username=%s", (username,))
-    return cur.fetchone()
-
-def record_referral(referrer_id: int, referred_id: int):
-    db = get_db()
-    cur = db.cursor()
-    try:
-        cur.execute(
-            "INSERT INTO referrals(referrer_user_id, referred_user_id, created_at) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING",
-            (referrer_id, referred_id, datetime.utcnow())
-        )
-        db.commit()
-    except Exception:
-        db.rollback()
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
 
 def check_blacklist(*, first_name: str|None, last_name: str|None, phone: str|None,
                     telegram_id: str|None, ref_code: str|None, ref_username: str|None) -> Optional[str]:
     db = get_db()
-<<<<<<< HEAD
-=======
-    cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
     name_val = None
     if first_name or last_name:
         name_val = normalize(f"{first_name or ''} {last_name or ''}")
 
     checks = [
-<<<<<<< HEAD
         ("phone",           normalize(phone)),
         ("telegram_id",     normalize(telegram_id)),
         ("referral_code",   normalize(ref_code)),
@@ -271,30 +169,10 @@ def check_blacklist(*, first_name: str|None, last_name: str|None, phone: str|Non
             row = cur.fetchone()
             if row:
                 return row["reason"] or f"Blocked by blacklist: {kind}"
-=======
-        ("phone", normalize(phone)),
-        ("telegram_id", normalize(telegram_id)),
-        ("referral_code", normalize(ref_code)),
-        ("referral_username", normalize(ref_username)),
-        ("name", name_val),
-    ]
-
-    for kind, value in checks:
-        if not value:
-            continue
-        cur.execute(
-            "SELECT reason FROM blacklist WHERE kind=%s AND value=%s AND active=1 LIMIT 1",
-            (kind, value)
-        )
-        row = cur.fetchone()
-        if row:
-            return row["reason"] or f"Blocked by blacklist: {kind}"
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
     return None
 
 def allocate_reserved_username(currency: Optional[str]) -> Optional[str]:
     db = get_db()
-<<<<<<< HEAD
     with dict_cur(db) as cur:
         if currency:
             cur.execute(
@@ -318,162 +196,11 @@ def mark_reserved_assigned(username: str, user_id: int):
             (user_id, datetime.utcnow(), username),
         )
         db.commit()
-=======
-    cur = db.cursor()
-    if currency:
-        cur.execute(
-            "SELECT username FROM reserved_accounts WHERE is_assigned=0 AND currency=%s ORDER BY id ASC LIMIT 1",
-            (currency,)
-        )
-        row = cur.fetchone()
-        if row:
-            return row[0]
-    cur.execute(
-        "SELECT username FROM reserved_accounts WHERE is_assigned=0 ORDER BY id ASC LIMIT 1"
-    )
-    row = cur.fetchone()
-    return row[0] if row else None
 
-def mark_reserved_assigned(username: str, user_id: int):
-    db = get_db()
-    cur = db.cursor()
-    cur.execute(
-        "UPDATE reserved_accounts SET is_assigned=1, assigned_user_id=%s, assigned_at=%s WHERE username=%s",
-        (user_id, datetime.utcnow(), username)
-    )
-    db.commit()
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
-
-def create_user_auto_username(
-    *, first_name: Optional[str], last_name: Optional[str], phone: Optional[str],
-    telegram_id: Optional[str], preferred_currency: Optional[str],
-    referred_by_code: Optional[str], referred_by_username: Optional[str]
-):
-    db = get_db()
-<<<<<<< HEAD
-
-    # Blacklist
-=======
-    cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
-    blocked_reason = check_blacklist(
-        first_name=first_name,
-        last_name=last_name,
-        phone=phone,
-        telegram_id=telegram_id,
-        ref_code=referred_by_code,
-<<<<<<< HEAD
-        ref_username=referred_by_username,
-=======
-        ref_username=referred_by_username
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
-    )
-    if blocked_reason:
-        raise ValueError(f"Signup blocked: {blocked_reason}")
-
-<<<<<<< HEAD
-    # Resolve referrer
-=======
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
-    referred_by_id = None
-    if referred_by_code:
-        ref_user = get_user_by_code(referred_by_code)
-        if ref_user:
-            referred_by_id = ref_user["id"]
-    if referred_by_id is None and referred_by_username:
-        ref_user = get_user_by_username(referred_by_username)
-        if ref_user:
-            referred_by_id = ref_user["id"]
-
-<<<<<<< HEAD
-    # Username from pool (or fallback AUTO_)
-    reserved_username = allocate_reserved_username(preferred_currency)
-    if not reserved_username:
-        reserved_username = "AUTO_" + gen_code(6)
-
-    # Create user
-    for _ in range(10):
-        user_code = gen_code()
-        try:
-            with dict_cur(db) as cur:
-                cur.execute(
-                    """
-                    INSERT INTO ref_users(username, code, first_name, last_name, phone, telegram_id, referred_by_user_id, created_at)
-                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
-                    RETURNING *
-                    """,
-                    (
-                        reserved_username,
-                        user_code,
-                        first_name or "",
-                        last_name  or "",
-                        phone,
-                        telegram_id,
-                        referred_by_id,
-                        datetime.utcnow(),
-                    ),
-                )
-                new_user = cur.fetchone()
-                db.commit()
-
-            # Mark reserved if actually from pool
-            with dict_cur(db) as cur:
-                cur.execute("SELECT id FROM reserved_accounts WHERE username=%s AND is_assigned=0", (reserved_username,))
-                if cur.fetchone():
-                    mark_reserved_assigned(reserved_username, new_user["id"])
-
-            # Record referral
-=======
-    reserved_username = allocate_reserved_username(preferred_currency)
-    if not reserved_username:
-        raise RuntimeError("No reserved usernames available.")
-
-    for _ in range(10):
-        user_code = gen_code()
-        try:
-            cur.execute(
-                """
-                INSERT INTO users(username, code, first_name, last_name, phone, telegram_id, referred_by_user_id, created_at)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
-                RETURNING *
-                """,
-                (
-                    reserved_username,
-                    user_code,
-                    first_name or "",
-                    last_name or "",
-                    phone,
-                    telegram_id,
-                    referred_by_id,
-                    datetime.utcnow()
-                )
-            )
-            new_user = cur.fetchone()
-            db.commit()
-
-            mark_reserved_assigned(reserved_username, new_user["id"])
-
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
-            if referred_by_id and referred_by_id != new_user["id"]:
-                record_referral(referred_by_id, new_user["id"])
-
-            return new_user
-        except Exception:
-            db.rollback()
-    raise RuntimeError("Could not create user.")
-<<<<<<< HEAD
-
-# ------------------------------
-# Templates (in-memory)
-# ------------------------------
-=======
-  
 # ------------------------------
 # Templates
 # ------------------------------
 
->>>>>>> f3c4714a8f2f4b38e3f984c53704bd3e48fec273
 BASE_HTML = """
 <!doctype html>
 <html lang="en">
