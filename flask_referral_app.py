@@ -649,3 +649,9 @@ def admin_accounts():
 @app.route("/admin/blacklist")
 def admin_blacklist():
     return render_template("admin_blacklist.html", APP_TITLE=APP_TITLE)
+
+if __name__ == "__main__":
+    with app.app_context():
+        init_db()
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=True)
